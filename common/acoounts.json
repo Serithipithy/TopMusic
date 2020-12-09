@@ -1,0 +1,9 @@
+{
+  "alexandra.mosoiu" : {
+  "password": "retele",
+  "accountType": 1},
+
+  "admin" : {
+    "password": "admin",
+    "accountType": 2}
+}
