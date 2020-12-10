@@ -21,11 +21,11 @@ int main (int argc, char *argv[])
 {
     int sd;			// descriptorul de socket
     struct sockaddr_in server;	// structura folosita pentru conectare
-    char msg[100];		// mesajul trimis
+    char msgToSend[400];		// mesajul trimis
+    char msgRead[400];          // mesajul citit
 
     /* exista toate argumentele in linia de comanda? */
-    if (argc != 3)
-    {
+    if (argc != 3){
         printf ("Sintaxa: %s <adresa_server> <port>\n", argv[0]);
         return -1;
     }
@@ -34,8 +34,7 @@ int main (int argc, char *argv[])
     port = atoi (argv[2]);
 
     /* cream socketul */
-    if ((sd = socket (AF_INET, SOCK_STREAM, 0)) == -1)
-    {
+    if ((sd = socket (AF_INET, SOCK_STREAM, 0)) == -1){
         perror ("Eroare la socket().\n");
         return errno;
     }
@@ -49,12 +48,39 @@ int main (int argc, char *argv[])
     server.sin_port = htons (port);
 
     /* ne conectam la server */
-    if (connect (sd, (struct sockaddr *) &server,sizeof (struct sockaddr)) == -1)
-    {
-        perror ("[client]Eroare la connect().\n");
+    if (connect (sd, (struct sockaddr *) &server,sizeof (struct sockaddr)) == -1){
+        perror("[client]Eroare la connect().\n");
         return errno;
     }
+    // TO DO :mesaj de intampinare
     while(1) {
+        // citire comanda client
+        bzero (msgToSend, 400);
+        printf ("::: ");
+        fflush (stdout);
+        read (0, msgToSend, 400);
+
+        // in cazul in care clientul a introdus comanda "QUIT"
+        if(strcmp(msgToSend,"quit!") == 0){
+            printf(">> Session ended!\n");
+            break;
+        }
+
+        // trimitere mesaj catre server
+        if (write (sd, msgToSend, 400) <= 0)        {
+            perror ("[client]Eroare la write() spre server.\n");
+            return errno;
+        }
+
+        // asteapta pana cand primeste raspuns/mesaj de la server
+        bzero(msgRead,400);
+        if (read (sd, msgRead, 400) < 0)        {
+            perror ("[client]Eroare la read() de la server.\n");
+            return errno;
+        }
+
+        // afisare mesaj trimis de catre server
+        printf (">> %s\n", msgRead);
 
     }
 
