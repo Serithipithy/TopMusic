@@ -8,7 +8,6 @@
 #include <netdb.h>
 #include <string.h>
 #include <arpa/inet.h>
-#include <json/value.h>
 #include <fstream>
 
 /* codul de eroare returnat de anumite apeluri */
@@ -52,36 +51,33 @@ int main (int argc, char *argv[])
         perror("[client]Eroare la connect().\n");
         return errno;
     }
-    // TO DO :mesaj de intampinare
+    // TODO :mesaj de intampinare
     while(1) {
         // citire comanda client
         bzero (msgToSend, 400);
         printf ("::: ");
         fflush (stdout);
         read (0, msgToSend, 400);
-
-        // in cazul in care clientul a introdus comanda "QUIT"
-        if(strcmp(msgToSend,"quit!") == 0){
-            printf(">> Session ended!\n");
-            break;
-        }
+        msgToSend[strlen(msgToSend)-1]='\0';
 
         // trimitere mesaj catre server
-        if (write (sd, msgToSend, 400) <= 0)        {
+        if (write (sd, msgToSend, 400) <= 0){
             perror ("[client]Eroare la write() spre server.\n");
             return errno;
         }
 
         // asteapta pana cand primeste raspuns/mesaj de la server
         bzero(msgRead,400);
-        if (read (sd, msgRead, 400) < 0)        {
+        if (read (sd, msgRead, 400) < 0){
             perror ("[client]Eroare la read() de la server.\n");
             return errno;
         }
 
         // afisare mesaj trimis de catre server
         printf (">> %s\n", msgRead);
-
+        if (strcmp(msgRead,"Quit!\n") == 0) {
+            break;
+        }
     }
 
     close (sd);
