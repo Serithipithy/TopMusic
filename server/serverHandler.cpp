@@ -9,9 +9,9 @@
 //#include <errno.h>
 //#include <unistd.h>
 #include <cstring>
-//#include <stdlib.h>
-#include <cstdio>
+#include <iostream>
 #include <sqlite3.h>
+//#include <stdlib.h>
 
 #define MAX_CHR 2048
 
@@ -19,6 +19,7 @@ using namespace std;
 void parssingMsg ( char *message){
     // prelucrare text
     char wk_text[MAX_CHR];
+    memset(wk_text,0,sizeof(wk_text));
     int i=0,k=0;
     while ( i != strlen(message) ){
         if ( k==0 && message[i]!=' ' )
@@ -49,6 +50,7 @@ int getCommand ( const char* message ){
     char seeTopGeneral[]="see top general";
     char seeTopByGenre[]="see top by";
     char seeUsers[]="see users";
+    char help[]="help";
 
     if(strstr( message, quit) != nullptr) return 1;
     else
@@ -73,5 +75,81 @@ int getCommand ( const char* message ){
     if(strstr( message, seeTopByGenre) != nullptr) return 11;
     else
     if(strstr( message, seeUsers) != nullptr) return 12;
+    else
+    if (strstr(message,help) != nullptr) return 13;
     else return 0;
+}
+char* getUserName(const char *str){
+    char *username = nullptr;
+    int i=0,k=0;
+    while( i != strlen(str) - 1 ){
+        if(str[i] != ' ')
+            username[k++]=str[i];
+        else
+            break;
+        i++;
+    }
+    return username;
+}
+void loginCommand(sqlite3* db,char* sql, int &adminORuser,char* serverResponse, const char* clientMessage, int identificator){
+    char *zErrMsg = nullptr;
+    char result[MAX_CHR];
+    int rc;
+    memset(result,0,sizeof(result));
+
+    rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
+    printf("Dupa sql: '%s'\n",result);
+    if( rc != SQLITE_OK ){
+        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        sqlite3_free(zErrMsg);
+    }
+    else
+    if(strstr(result, clientMessage)){
+        printf("%s\n",result);
+        strcpy(serverResponse, "Logged in!\n");
+        adminORuser = identificator;
+    }
+    else {
+        strcpy(serverResponse, "Wrong username! Try again or register now.\n");
+    }
+}
+void registerCommand(sqlite3* db, int &adminORuser,char* serverResponse,const char* clientMessage){
+    char *zErrMsg = nullptr;
+    char result[MAX_CHR];
+    char sql[MAX_CHR];
+    int rc;
+    memset(result,0,sizeof(result));
+
+    sprintf(sql, "INSERT INTO users (username, canvote) VALUES ('%s','yes');", clientMessage);
+    rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
+
+    if( rc != SQLITE_OK ){
+        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        strcpy(serverResponse, "Can't create an account with this username because this username already exists. Login or try again!\n");
+        sqlite3_free(zErrMsg);
+    } else {
+        strcpy(serverResponse, "Succesfull registration!\n");
+        adminORuser = 2;
+    }
+}
+
+// not in main
+static int callback(void *NowUsed, int argc, char **argv, char **azColName){
+    char* data= (char*) NowUsed;
+    for(int i = 0; i<argc; i++) {
+        strcat(data,azColName[i]);
+        strcat(data," : ");
+        strcat(data,argv[i] ? argv[i] : "NULL");
+        strcat (data, "\n");
+        printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+    }
+    strcat(data,"\n");
+    return 0;
+}
+static int callbackInsert(void *NotUsed, int argc, char **argv, char **azColName) {
+    for(int i = 0; i<argc; i++) {
+        printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+    }
+    printf("\n");
+    return 0;
 }
