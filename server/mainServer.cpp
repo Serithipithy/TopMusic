@@ -10,7 +10,7 @@
 #include <sqlite3.h>
 
 /* portul folosit */
-#define PORT 2010
+#define PORT 2021
 #define MAX_CHR 2048
 /* codul de eroare returnat de anumite apeluri */
 extern int errno;
@@ -54,6 +54,18 @@ int main ()
         return(0);
     } else {
         fprintf(stderr, "[Server]Opened database successfully\n");
+    }
+
+    memset(sql,0, sizeof(sql)); // penrru delete cascade
+    sprintf(sql,"PRAGMA foreign_keys=on;");
+
+    rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
+
+    if( rc != SQLITE_OK ){
+        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        sqlite3_free(zErrMsg);
+    } else {
+        fprintf(stderr, "[Server]Foreign_keys activated.\n");
     }
 
     /* crearea unui socket */
@@ -113,6 +125,7 @@ int main ()
         if( pid == 0 ) { // procesul copil
             int adminORuser=0;
             int command;
+            char *user = nullptr;
 
             while (true) {
                 /* s-a realizat conexiunea, se astepta mesajul */
@@ -128,9 +141,9 @@ int main ()
                     close(client);    /* inchidem conexiunea cu clientul */
                     continue;        /* continuam sa ascultam */
                 }
-                parssingMsg(clientMessage); /* scoatem spatiile care nu ne sunt necesare */
+                parsingMsg(clientMessage); /* scoatem spatiile care nu ne sunt necesare */
                 command = getCommand (clientMessage);
-                printf("Dupa parsare: %s\n",clientMessage);
+                printf("[server]Dupa parsare: %s\n",clientMessage);
                 memset(serverResponse, 0, sizeof (serverResponse));           /*pregatim mesajul de raspuns */
 
                 if( command == 1 ){ // quit
@@ -142,19 +155,21 @@ int main ()
                     if( adminORuser == 0 ) {
                         strcpy(clientMessage, clientMessage + strlen("login user "));
                         printf("%s\n",clientMessage);
-                        sprintf(sql, "SELECT username FROM users WHERE username like '%s%c';", clientMessage,'%');
-                        loginCommand(db,sql,adminORuser,serverResponse,clientMessage,2);
+                        memset(sql,0,sizeof(sql));
+                        sprintf(sql, "SELECT username FROM user WHERE username like '%s';", clientMessage);
+                        loginCommand(db,sql,adminORuser,serverResponse,clientMessage,2,user);
                     } else {
                         strcpy(serverResponse, "Already logged in!\n");
                     }
                 }
                 else
-                if( command == 3 ) { // login admin
+                if( command == 3 ){ // login admin
                     if (adminORuser == 0) {
                         strcpy(clientMessage, clientMessage + strlen("login admin "));
-                        printf("%s\n", clientMessage);
-                        sprintf(sql, "SELECT * FROM admins WHERE username='%s%c';", clientMessage,'%');
-                        loginCommand(db,sql,adminORuser,serverResponse,clientMessage,1);
+                        printf("[server]%s\n", clientMessage);
+                        memset(sql,0,sizeof(sql));
+                        sprintf(sql, "SELECT * FROM admins WHERE username='%s';", clientMessage);
+                        loginCommand(db,sql,adminORuser,serverResponse,clientMessage,1,user);
                     } else {
                      strcpy(serverResponse, "Already logged in!\n");
                     }
@@ -163,7 +178,7 @@ int main ()
                 if( command == 4 ){ // register
                     if (adminORuser == 0){
                         strcpy(clientMessage, clientMessage + strlen("register "));
-                        printf("in register command: '%s'\n",clientMessage);
+                        printf("[server]in register command: '%s'\n",clientMessage);
                         registerCommand(db,adminORuser,serverResponse,clientMessage);
                     }
                     else {
@@ -182,28 +197,7 @@ int main ()
                         else
                         {
                         strcpy(clientMessage, clientMessage + strlen("delete song "));
-                        sprintf(sql, "SELECT * FROM songs WHERE ID='%s';", clientMessage);
-                        rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
-
-                        if( rc != SQLITE_OK ){
-                            fprintf(stderr, "SQL error: %s\n", zErrMsg);
-                            sqlite3_free(zErrMsg);
-                        }
-                        else{
-                            if (strstr(clientMessage, result) != nullptr){
-                                strcpy(serverResponse, "There is no song with this ID in the database. Try again!\n");
-                            }
-                            else{
-                                sprintf(sql, "DELETE FROM songs WHERE ID=%s;", clientMessage); // TODO sterge si din restul tabelelor
-                                rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
-
-                                if( rc != SQLITE_OK ){
-                                    fprintf(stderr, "SQL error: %s\n", zErrMsg);
-                                    sqlite3_free(zErrMsg);
-                                }
-                                sprintf(serverResponse, "The song with the ID:%s was deleted!\n",clientMessage);
-                            }
-                        }
+                        deleteSongCommand(db,clientMessage,serverResponse);
                     }
                 }
                 else
@@ -216,48 +210,49 @@ int main ()
                             strcpy(serverResponse, "You don't have the permission to use this command.\n");
                         }
                         else
-                        {
+                        {   printf("[server]sunt aici\n");
+                            char userName[100];
+                            char right[4];
                             strcpy(clientMessage, clientMessage + strlen("restrict vote for "));
-                            char* userName=getUserName(clientMessage);      // preluam usernameul utilizatorului caruia vrom sa ii schimba dreptul de a vota
-                            strcpy(clientMessage,clientMessage + strlen(userName) + 1);         // pastram doar dreptul pe care vrem sa il schimbam
-                            if(strcmp("yes",clientMessage) == 0 || strcmp("no",clientMessage) == 0){        // verificam daca comanda a fost introdusa corect si putem sa ii schimba drepturi
-                                sprintf(sql, "SELECT * FROM users WHERE ID='%s';", userName);       // cautam utilizatorul
-                                rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
 
-                                if( rc != SQLITE_OK ){
-                                    fprintf(stderr, "SQL error: %s\n", zErrMsg);
-                                    sqlite3_free(zErrMsg);
-                                }
-                                else{
-                                    if (strstr(clientMessage, result) != nullptr){      // usernameul nu s-a gasit
-                                        strcpy(serverResponse, "There is no user with this ID in the database. Try again!\n");
-                                    }
-                                    else{       // usernameul s-a gasit, de ci se poate efectua schimbarea
-                                        sprintf(sql, "UPDATE users SET canvote=%s WHERE ID=%s;", clientMessage, userName);      // modificam dreptul sau la vot
-                                        rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
-
-                                        if( rc != SQLITE_OK ){
-                                            fprintf(stderr, "SQL error: %s\n", zErrMsg);
-                                            sqlite3_free(zErrMsg);
-                                        }
-                                        sprintf(serverResponse, "The song with the ID:%s was deleted!\n", userName);        // mesaj de succes
-                                    }
-                                }
-                            }
-                            else
-                                strcpy(serverResponse,"Wrong format. Try again!\n");
-
+                            getUserName(clientMessage,userName);      // preluam usernameul utilizatorului caruia vrom sa ii schimba dreptul de a vota
+                            strcpy(right,clientMessage + strlen(userName) + 1);         // pastram doar dreptul pe care vrem sa il schimbam
+                            restrictVoteCommand(db,userName,right,serverResponse);
                         }
                 }
                 else
-                if( command == 7 ){
-                    strcpy(clientMessage, clientMessage + strlen("add song "));
-                    printf("in add song command: '%s'\n",clientMessage);
-                    // add song
+                if( command == 7 ){     // add song
+                    if (adminORuser == 0){      // in cazul in care nu este conectat niciun fel de utilizator
+                        strcpy(serverResponse, "Login first!\n");
+                    }
+                    else
+                        if(adminORuser == 1){
+                            strcpy(serverResponse,"You don't have the permission to use this command.");
+                        }
+                        else{
+                                strcpy(clientMessage, clientMessage + strlen("add song "));
+                                printf("[server]in add song command: '%s'\n",clientMessage);
+                                addSongCommand(db,clientMessage,serverResponse);
+                            }
                 }
                 else
                 if( command == 8 ){
-                    strcpy(clientMessage, clientMessage + strlen("vote song "));
+                    if (adminORuser == 0){      // in cazul in care nu este conectat niciun fel de utilizator
+                        strcpy(serverResponse, "Login first!\n");
+                    }
+                    else
+                    if(adminORuser == 1){
+                        strcpy(serverResponse,"You don't have the permission to use this command.\n");
+                    }
+                    else {
+                        strcpy(clientMessage, clientMessage + strlen("vote song "));
+                        if(canvote(db,user) == 1)
+                            voteSongCommand(db,clientMessage,serverResponse);
+                        else{
+                            strcpy(serverResponse,"You can't vote right now because an admin took this right from you.\n");
+                        }
+
+                    }
                     // vote song
                 }
                 else
