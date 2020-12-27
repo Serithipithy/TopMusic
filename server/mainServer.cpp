@@ -12,19 +12,15 @@
 /* portul folosit */
 #define PORT 2010
 #define MAX_CHR 2048
-
 /* codul de eroare returnat de anumite apeluri */
 extern int errno;
-static int callback(void *str, int argc, char **argv, char **azColName){
-    int i;
-    char* data= (char*) str;
-    for(i = 0; i<argc; i++) {
+sqlite3 *db;
+static int callback(void *NowUsed, int argc, char **argv, char **azColName){
+    char* data= (char*) NowUsed;
+    for(int i = 0; i<argc; i++) {
         strcat(data,azColName[i]);
         strcat(data," : ");
-        if(argv[i])
-            strcat(data,argv[i]);
-        else
-            strcat(data,"NULL");
+        strcat(data,argv[i] ? argv[i] : "NULL");
         strcat (data, "\n");
         printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
     }
@@ -32,8 +28,7 @@ static int callback(void *str, int argc, char **argv, char **azColName){
     return 0;
 }
 static int callbackInsert(void *NotUsed, int argc, char **argv, char **azColName) {
-    int i;
-    for(i = 0; i<argc; i++) {
+    for(int i = 0; i<argc; i++) {
         printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
     }
     printf("\n");
@@ -43,18 +38,16 @@ int main ()
 {
     struct sockaddr_in server{};	// structura folosita de server
     struct sockaddr_in from{};
-    char msgclient[MAX_CHR];		          //mesajul primit de la client
-    char msgrasp[MAX_CHR]=" ";        //mesaj de raspuns pentru client
+    char clientMessage[MAX_CHR];		          //mesajul primit de la client
+    char serverResponse[MAX_CHR]=" ";        //mesaj de raspuns pentru client
     int sd;			//descriptorul de socket
     // conectare la baza de date
-    sqlite3 *db;
-    //char *zErrMsg = 0;
+    char *zErrMsg = nullptr;
     char sql[MAX_CHR];
     char result[MAX_CHR];
     int rc;
 
-    // open baza de date
-    rc = sqlite3_open("topmusic.db", &db);
+    rc = sqlite3_open("topmusic.db", &db); // deschidere baza de date
 
     if( rc ) {
         fprintf(stderr, "[server]Can't open database: %s\n", sqlite3_errmsg(db));
@@ -75,12 +68,9 @@ int main ()
     bzero (&from, sizeof (from));
 
     /* umplem structura folosita de server */
-    /* stabilirea familiei de socket-uri */
-    server.sin_family = AF_INET;
-    /* acceptam orice adresa */
-    server.sin_addr.s_addr = htonl (INADDR_ANY);
-    /* utilizam un port utilizator */
-    server.sin_port = htons (PORT);
+    server.sin_family = AF_INET;                        /* stabilirea familiei de socket-uri */
+    server.sin_addr.s_addr = htonl (INADDR_ANY);        /* acceptam orice adresa */
+    server.sin_port = htons (PORT);                     /* utilizam un port utilizator */
 
     /* atasam socketul */
     if (bind (sd, (struct sockaddr *) &server, sizeof (struct sockaddr)) == -1)
@@ -126,178 +116,180 @@ int main ()
 
             while (true) {
                 /* s-a realizat conexiunea, se astepta mesajul */
-                bzero(msgclient, MAX_CHR);
+                //bzero(clientMessage, MAX_CHR);
+                memset(clientMessage,0,MAX_CHR);
                 printf("[server]Asteptam mesajul...\n");
                 fflush(stdout);
-
+                memset(sql,0,sizeof (sql));
+                memset(result,0,sizeof (result));
                 /* citirea mesajului */
-                if (read(client, msgclient, MAX_CHR) <= 0) {
+                if (read(client, clientMessage, MAX_CHR) <= 0) {
                     perror("[server]Eroare la read() de la client.\n");
                     close(client);    /* inchidem conexiunea cu clientul */
                     continue;        /* continuam sa ascultam */
                 }
+                parssingMsg(clientMessage); /* scoatem spatiile care nu ne sunt necesare */
+                command = getCommand (clientMessage);
+                printf("Dupa parsare: %s\n",clientMessage);
+                memset(serverResponse, 0, sizeof (serverResponse));           /*pregatim mesajul de raspuns */
 
-                parssingMsg(msgclient); // scoatem spatiile care nu ne sunt necesare
-                command = getCommand (msgclient);
-
-                /*pregatim mesajul de raspuns */
-                memset(msgrasp, 0,sizeof (msgrasp));
                 if( command == 1 ){ // quit
                     printf("[server] Closing client connection...\n");
-                    strcpy(msgrasp,"Quit!\n");
+                    strcpy(serverResponse, "Quit!\n");
                 }
                 else
                 if( command == 2 ){ // login user
-
                     if( adminORuser == 0 ) {
-                        strcpy(msgclient,msgclient+strlen("login user "));
-                        printf("%s\n",msgclient);
-                        char *zErrMsg= nullptr;
-                        memset(sql,0,sizeof (sql));
-                        memset(sql,0,sizeof (result));
-                        sprintf(sql,"SELECT * FROM users WHERE username='%s';",msgclient);
-                        rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
-                        if( rc != SQLITE_OK ){
-                            fprintf(stderr, "SQL error: %s\n", zErrMsg);
-                            sqlite3_free(zErrMsg);
-                            adminORuser = 0;
-                        }
-                        else
-                        if(strstr(result,msgclient)){
-                            printf("%s\n",result);
-                            strcpy(msgrasp,"Logged in!\n");
-                            adminORuser = 2;
-                        }
-                        else {
-                            strcpy(msgrasp,"Wrong username! Try again or register now.\n");
-                            adminORuser = 0;
-                        }
+                        strcpy(clientMessage, clientMessage + strlen("login user "));
+                        printf("%s\n",clientMessage);
+                        sprintf(sql, "SELECT username FROM users WHERE username like '%s%c';", clientMessage,'%');
+                        loginCommand(db,sql,adminORuser,serverResponse,clientMessage,2);
                     } else {
-                        strcpy(msgrasp,"Already logged in!\n");
+                        strcpy(serverResponse, "Already logged in!\n");
                     }
                 }
                 else
                 if( command == 3 ) { // login admin
                     if (adminORuser == 0) {
-                        strcpy(msgclient, msgclient + strlen("login admin "));
-                        strcpy(msgclient,msgclient+strlen("login user "));
-                        printf("%s\n",msgclient);
-                        char *zErrMsg= nullptr;
-                        memset(sql,0,sizeof (sql));
-                        memset(sql,0,sizeof (result));
-                        sprintf(sql,"SELECT * FROM admins WHERE username='%s';",msgclient);
-                        rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
-                        if( rc != SQLITE_OK ){
-                            fprintf(stderr, "SQL error: %s\n", zErrMsg);
-                            sqlite3_free(zErrMsg);
-                            adminORuser = 0;
-                        }
-                        else
-                        if(strstr(result,msgclient)){
-                            printf("%s\n",result);
-                            strcpy(msgrasp,"Logged in!\n");
-                            adminORuser = 1;
-                        }
-                        else {
-                            strcpy(msgrasp,"Wrong username! Try again or register now.\n");
-                            adminORuser = 0;
-                        }
+                        strcpy(clientMessage, clientMessage + strlen("login admin "));
+                        printf("%s\n", clientMessage);
+                        sprintf(sql, "SELECT * FROM admins WHERE username='%s%c';", clientMessage,'%');
+                        loginCommand(db,sql,adminORuser,serverResponse,clientMessage,1);
+                    } else {
+                     strcpy(serverResponse, "Already logged in!\n");
                     }
-                    else {
-                     strcpy(msgrasp, "Already logged in!\n");
-                }
                 }
                 else
                 if( command == 4 ){ // register
                     if (adminORuser == 0){
-                        strcpy(msgclient, msgclient + strlen("register "));
-                        char *zErrMsg = nullptr;
-                        memset(sql,0,sizeof (sql));
-                        memset(sql,0,sizeof (result));;
-
-                        sprintf(sql,"SELECT * FROM users WHERE username='%s';",msgclient);
+                        strcpy(clientMessage, clientMessage + strlen("register "));
+                        printf("in register command: '%s'\n",clientMessage);
+                        registerCommand(db,adminORuser,serverResponse,clientMessage);
+                    }
+                    else {
+                        strcpy(serverResponse, "Logout first!\n");
+                    }
+                }
+                else
+                if( command == 5 ){ // delete song
+                    if ( adminORuser == 0 ){
+                        strcpy(serverResponse, "Login first!\n");
+                    }
+                    else
+                        if ( adminORuser == 2 ){
+                            strcpy(serverResponse, "You don't have the permission to use this command.\n");
+                        }
+                        else
+                        {
+                        strcpy(clientMessage, clientMessage + strlen("delete song "));
+                        sprintf(sql, "SELECT * FROM songs WHERE ID='%s';", clientMessage);
                         rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
 
                         if( rc != SQLITE_OK ){
                             fprintf(stderr, "SQL error: %s\n", zErrMsg);
                             sqlite3_free(zErrMsg);
-                            adminORuser = 0;
+                        }
+                        else{
+                            if (strstr(clientMessage, result) != nullptr){
+                                strcpy(serverResponse, "There is no song with this ID in the database. Try again!\n");
+                            }
+                            else{
+                                sprintf(sql, "DELETE FROM songs WHERE ID=%s;", clientMessage); // TODO sterge si din restul tabelelor
+                                rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
+
+                                if( rc != SQLITE_OK ){
+                                    fprintf(stderr, "SQL error: %s\n", zErrMsg);
+                                    sqlite3_free(zErrMsg);
+                                }
+                                sprintf(serverResponse, "The song with the ID:%s was deleted!\n",clientMessage);
+                            }
+                        }
+                    }
+                }
+                else
+                if( command == 6 ){ // restrict vote
+                    if (adminORuser == 0){      // in cazul in care nu este conectat niciun fel de utilizator
+                        strcpy(serverResponse, "Login first!\n");
+                    }
+                    else
+                        if(adminORuser == 2){        // in cazul in care clietntul este conectat ca un user common
+                            strcpy(serverResponse, "You don't have the permission to use this command.\n");
                         }
                         else
-                        if(strstr(msgclient,result) != nullptr){
-                            strcpy(msgrasp,"This username already exists. Login or try again!\n");
-                            adminORuser = 0;
-                        }
-                        else {
-                            sql[0]=0;
-                            result[0]=0;
+                        {
+                            strcpy(clientMessage, clientMessage + strlen("restrict vote for "));
+                            char* userName=getUserName(clientMessage);      // preluam usernameul utilizatorului caruia vrom sa ii schimba dreptul de a vota
+                            strcpy(clientMessage,clientMessage + strlen(userName) + 1);         // pastram doar dreptul pe care vrem sa il schimbam
+                            if(strcmp("yes",clientMessage) == 0 || strcmp("no",clientMessage) == 0){        // verificam daca comanda a fost introdusa corect si putem sa ii schimba drepturi
+                                sprintf(sql, "SELECT * FROM users WHERE ID='%s';", userName);       // cautam utilizatorul
+                                rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
 
-                            sprintf(sql,"INSERT INTO users (username, canvote) VALUES ('%s','yes');",msgclient);
-                            rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
+                                if( rc != SQLITE_OK ){
+                                    fprintf(stderr, "SQL error: %s\n", zErrMsg);
+                                    sqlite3_free(zErrMsg);
+                                }
+                                else{
+                                    if (strstr(clientMessage, result) != nullptr){      // usernameul nu s-a gasit
+                                        strcpy(serverResponse, "There is no user with this ID in the database. Try again!\n");
+                                    }
+                                    else{       // usernameul s-a gasit, de ci se poate efectua schimbarea
+                                        sprintf(sql, "UPDATE users SET canvote=%s WHERE ID=%s;", clientMessage, userName);      // modificam dreptul sau la vot
+                                        rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
 
-                            if( rc != SQLITE_OK ){
-                                fprintf(stderr, "SQL error: %s\n", zErrMsg);
-                                sqlite3_free(zErrMsg);
-                                adminORuser = 0;
+                                        if( rc != SQLITE_OK ){
+                                            fprintf(stderr, "SQL error: %s\n", zErrMsg);
+                                            sqlite3_free(zErrMsg);
+                                        }
+                                        sprintf(serverResponse, "The song with the ID:%s was deleted!\n", userName);        // mesaj de succes
+                                    }
+                                }
                             }
-                            strcpy(msgrasp,"Succesfull registration!\n");
-                            adminORuser = 2;
+                            else
+                                strcpy(serverResponse,"Wrong format. Try again!\n");
+
                         }
-                    }
-                    else {
-                        strcpy(msgrasp,"Logout first!\n");
-                    }
-                }
-                else
-                if( command == 5 ){
-                    strcpy(msgclient, msgclient + strlen("delete song "));
-                    // delete song
-                }
-                else
-                if( command == 6 ){
-                    strcpy(msgclient, msgclient + strlen("restrict vote for "));
-                    // restrict vote
                 }
                 else
                 if( command == 7 ){
-                    strcpy(msgclient, msgclient + strlen("add song "));
+                    strcpy(clientMessage, clientMessage + strlen("add song "));
+                    printf("in add song command: '%s'\n",clientMessage);
                     // add song
                 }
                 else
                 if( command == 8 ){
-                    strcpy(msgclient, msgclient + strlen("vote song "));
+                    strcpy(clientMessage, clientMessage + strlen("vote song "));
                     // vote song
                 }
                 else
                 if( command == 9 ){
-                    strcpy(msgclient, msgclient + strlen("add comment "));
+                    strcpy(clientMessage, clientMessage + strlen("add comment "));
                     // add comm
                 }
                 else
                 if( command == 10 ){
-                    strcpy(msgclient, msgclient + strlen("see top general "));
+                    strcpy(clientMessage, clientMessage + strlen("see top general "));
                     // see top general
                 }
                 else
                 if( command == 11 ){
-                    strcpy(msgclient, msgclient + strlen("see top by "));
+                    strcpy(clientMessage, clientMessage + strlen("see top by "));
                     // see top by genre
                 }
                 else
                 if ( command == 12 ){
-                    strcpy(msgclient, msgclient + strlen("see users "));
+                    strcpy(clientMessage, clientMessage + strlen("see users "));
                     // see users
                 }
-                else strcpy(msgrasp,"Wrong format or inexistent command. Try again!\n"); // no known command
+                else strcpy(serverResponse, "Wrong format or inexistent command. Try again!\n"); // no known command
 
                 /* returnam mesajul clientului */
-                if (write(client, msgrasp, strlen(msgrasp)) <= 0) {
+                if (write(client, serverResponse, strlen(serverResponse)) <= 0) {
                     perror("[server]Eroare la write() catre client.\n");
                     continue;        /* continuam sa ascultam */
                 } else
                     printf("[server]Mesajul a fost trasmis cu succes.\n");
 
-                if (strcmp(msgrasp,"Quit!\n") == 0){
+                if (strcmp(serverResponse, "Quit!\n") == 0){
                     close(client);
                     break;
                 }
