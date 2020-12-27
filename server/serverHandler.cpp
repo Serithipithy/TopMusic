@@ -119,6 +119,7 @@ void registerCommand(sqlite3* db, int &adminORuser,char* serverResponse,const ch
     char sql[MAX_CHR];
     int rc;
     memset(result,0,sizeof(result));
+    memset(sql,0,sizeof(sql));
 
     sprintf(sql, "INSERT INTO users (username, canvote) VALUES ('%s','yes');", clientMessage);
     rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
@@ -131,6 +132,72 @@ void registerCommand(sqlite3* db, int &adminORuser,char* serverResponse,const ch
         strcpy(serverResponse, "Succesfull registration!\n");
         adminORuser = 2;
     }
+}
+void addSongCommand(sqlite3* db,const char* clientMessage, char* serverResponse){
+    char text[MAX_CHR],titlu[100],descriere[1000],link[200];
+    int k;
+    memset(text,0, sizeof(text));
+    memset(titlu,0, sizeof(titlu));
+    memset(descriere,0,sizeof(descriere));
+    memset(link,0,sizeof(link));
+
+    strcpy(text,clientMessage);
+    if(numberofappearances(text,'<') != 3 || numberofappearances(text,'>') != 3){
+        strcpy(serverResponse,"Wrong format! add song <title> <description> <link> \n");
+    }
+    else
+        if(text[0] != '<' || text[strlen(text)-1] != '>')
+            strcpy(serverResponse,"Wrong format! add song <title> <description> <link> \n");
+        else{
+            strcpy(text,text+1);
+            k=0;
+            while (text[0] != '>'){
+                titlu[k++]=text[0];
+                strcpy(text,text+1);
+            }
+
+            if( text[1] != ' ' || text[2] != '<' )
+                strcpy(serverResponse,"Wrong format! add song <title> <description> <link> \n");
+            else{
+                strcpy(text,text+3); // stergem "> <"
+                k=0;
+                while (text[0] != '>'){
+                    descriere[k++]=text[0];
+                    strcpy(text,text+1);
+                }
+                if( text[1] != ' ' || text[2] != '<' )
+                    strcpy(serverResponse,"Wrong format! add song <title> <description> <link> \n");
+                else{
+                    strcpy(text,text+3);
+                    k=0;
+                    while (text[0] != '>') {
+                        link[k++] = text[0];
+                        strcpy(text, text + 1);
+                    }
+                    if (strlen(titlu) < 1 || strlen(descriere) < 1 || strlen(link) < 1)
+                        strcpy(serverResponse,"Wrong format! One of the atributes is empty. add song <title> <description> <link> \n");
+                    else { // adaugare in baza de date
+                        char *zErrMsg = nullptr;
+                        char result[MAX_CHR];
+                        char sql[MAX_CHR];
+                        int rc;
+                        memset(result,0,sizeof(result));
+                        memset(sql,0,sizeof(sql));
+
+                        sprintf(sql, "INSERT INTO songs (titlu, descriere, link) VALUES ('%s','%s','%s');", titlu,descriere,link);
+                        rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
+
+                        if( rc != SQLITE_OK ){
+                            fprintf(stderr, "SQL error: %s\n", zErrMsg);
+                            strcpy(serverResponse, "Can't add this song.\n");
+                            sqlite3_free(zErrMsg);
+                        } else {
+                            strcpy(serverResponse, "Song added!\n");
+                        }
+                    }
+                }
+            }
+        }
 }
 
 // not in main
@@ -152,4 +219,11 @@ static int callbackInsert(void *NotUsed, int argc, char **argv, char **azColName
     }
     printf("\n");
     return 0;
+}
+
+int numberofappearances(char text[MAX_CHR], char character){ // numarul de aparitii ale unui caracter
+    int app=0;
+    for( int i = 0; i < strlen(text) ; i++)
+        if(text[i] == character)app++;
+    return app;
 }
