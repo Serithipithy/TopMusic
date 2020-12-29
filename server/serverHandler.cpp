@@ -51,6 +51,8 @@ int getCommand ( const char* message ){
     char seeTopByGenre[]="see top by";
     char seeUsers[]="see users";
     char help[]="help";
+    char logout[]="logout";
+    char seegenres[]="see genres";
 
     if(strstr( message, quit) != nullptr) return 1;
     else
@@ -70,13 +72,17 @@ int getCommand ( const char* message ){
     else
     if(strstr( message, addComment) != nullptr) return 9;
     else
-    if(strstr( message, seeTopGeneral) != nullptr) return 10;
+    if(strstr( message, seeTopByGenre) != nullptr) return 10;
     else
-    if(strstr( message, seeTopByGenre) != nullptr) return 11;
+    if(strstr( message, seeTopGeneral) != nullptr) return 11;
     else
     if(strstr( message, seeUsers) != nullptr) return 12;
     else
-    if (strstr(message,help) != nullptr) return 13;
+    if(strstr(message,help) != nullptr && strlen(message) == strlen(help)) return 13;
+    else
+    if(strstr(message,logout) != nullptr && strlen(message) == strlen(logout)) return 14;
+    else
+    if(strstr(message,seegenres) != nullptr && strlen(message) == strlen(seegenres)) return 15;
     else return 0;
 }
 void getUserName(const char *str, char username[100]){
@@ -89,15 +95,15 @@ void getUserName(const char *str, char username[100]){
         i++;
     }
 }
-void loginCommand(sqlite3* db,char* sql, int &adminORuser,char* serverResponse, const char* clientMessage, int identificator, char* username){
+void loginCommand(sqlite3* db,char* sql, int &adminORuser,char* serverResponse, const char* clientMessage, int identificator){
     char *zErrMsg = nullptr;
     char result[MAX_CHR];
     int rc;
     memset(result,0,sizeof(result));
 
     rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
-    printf("Dupa sql: '%s'\n",result);
     if( rc != SQLITE_OK ){
+        strcpy(serverResponse, "Something went wrong, try again!\n");
         fprintf(stderr, "SQL error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
     }
@@ -106,7 +112,6 @@ void loginCommand(sqlite3* db,char* sql, int &adminORuser,char* serverResponse, 
         printf("%s\n",result);
         strcpy(serverResponse, "Logged in!\n");
         adminORuser = identificator;
-        strcpy(username,clientMessage);
     }
     else {
         strcpy(serverResponse, "Wrong username! Try again or register now.\n");
@@ -128,12 +133,12 @@ void registerCommand(sqlite3* db, int &adminORuser,char* serverResponse,const ch
         strcpy(serverResponse, "Can't create an account with this username because this username already exists. Login or try again!\n");
         sqlite3_free(zErrMsg);
     } else {
-        strcpy(serverResponse, "Succesfull registration!\n");
+        strcpy(serverResponse, "Successful registration!\n");
         adminORuser = 2;
     }
 }
 void addSongCommand(sqlite3* db,const char* clientMessage, char* serverResponse){
-    char text[MAX_CHR],titlu[100],descriere[1000],link[200],genuri[200];
+    char text[MAX_CHR],titlu[1000],descriere[1000],link[1000],genuri[200];
     int k;
     memset(text,0, sizeof(text));
     memset(titlu,0, sizeof(titlu));
@@ -155,7 +160,7 @@ void addSongCommand(sqlite3* db,const char* clientMessage, char* serverResponse)
                 titlu[k++]=text[0];
                 strcpy(text,text+1);
             }
-
+            printf("%s\n",titlu);
             if( text[1] != ' ' || text[2] != '<' )
                 strcpy(serverResponse,"Wrong format! add song <title> <description> <link> <genre(s)>\n");
             else{
@@ -165,6 +170,7 @@ void addSongCommand(sqlite3* db,const char* clientMessage, char* serverResponse)
                     descriere[k++]=text[0];
                     strcpy(text,text+1);
                 }
+                printf("%s\n",descriere);
                 if( text[1] != ' ' || text[2] != '<' )
                     strcpy(serverResponse,"Wrong format! add song <title> <description> <link> <genre(s)>\n");
                 else{
@@ -174,6 +180,7 @@ void addSongCommand(sqlite3* db,const char* clientMessage, char* serverResponse)
                         link[k++] = text[0];
                         strcpy(text, text + 1);
                     }
+                    printf("%s\n",link);
                     if ( text[1] != ' ' || text[2] != '<' )
                         strcpy(serverResponse,"Wrong format! add song <title> <description> <link> <genre(s)>\n");
                     else{
@@ -183,8 +190,12 @@ void addSongCommand(sqlite3* db,const char* clientMessage, char* serverResponse)
                             genuri[k++] = text[0];
                             strcpy(text, text + 1);
                         }
-                        if (strlen(titlu) < 1 || strlen(descriere) < 1 || strlen(link) < 1 || strlen(genuri) < 1)
-                        strcpy(serverResponse,"Wrong format! One of the atributes is empty. add song <title> <description> <link> <genre(s)>\n");
+                        printf("%s\n",genuri);
+                        if (strlen(titlu) < 1 || strlen(descriere) < 1 || strlen(link) < 1 || strlen(genuri) < 1) {
+                            printf("%zu, %zu, %zu, %zu\n",strlen(titlu),strlen(descriere),strlen(link),strlen(genuri));
+                            strcpy(serverResponse,
+                                   "Wrong format! One of the atributes is empty. add song <title> <description> <link> <genre(s)>\n");
+                        }
                         else{ // adaugare in baza de date
                             char *zErrMsg = nullptr;
                             char result[MAX_CHR];
@@ -201,7 +212,6 @@ void addSongCommand(sqlite3* db,const char* clientMessage, char* serverResponse)
                                 strcpy(serverResponse, "Can't add this song.\n");
                                 sqlite3_free(zErrMsg);
                             } else {
-                                //strcpy(serverResponse, "Song added!\n");
                                 memset(sql,0,sizeof(sql));
                                 sprintf(sql, "SELECT id FROM songs WHERE titlu='%s';",titlu);
                                 rc = sqlite3_exec(db, sql, callbackID, result, &zErrMsg);
@@ -298,7 +308,7 @@ void voteSongCommand(sqlite3* db,char* clientMessage,char* serverResponse){
     int rc;
     memset(sql,0,sizeof(sql));
 
-    sprintf(sql, "UPDATE songs SET vote=vote+1 WHERE ID='%s';", clientMessage);
+    sprintf(sql, "UPDATE songs SET votes=votes+1 WHERE ID='%s';", clientMessage);
     rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
 
     if( rc != SQLITE_OK ){
@@ -309,7 +319,85 @@ void voteSongCommand(sqlite3* db,char* clientMessage,char* serverResponse){
         sprintf(serverResponse,"You just voted the song with the ID: %s. Thank you!", clientMessage);
     }
 }
-int canvote(sqlite3* db,char* user){
+void addCommentCommand(sqlite3* db,char* clientMessage,char* serverResponse,char user[100]){
+    int k;
+    char text[MAX_CHR];
+    char comment[MAX_CHR];
+    char IDsong[100];
+    memset(text,0, sizeof(text));
+    memset(comment,0, sizeof(comment));
+    memset(IDsong,0, sizeof(IDsong));
+
+    strcpy(text,clientMessage);
+
+    if(numberofappearances(text,'<') != 2 && numberofappearances(text,'>') != 2){
+        strcpy(serverResponse,"Wrong format! add comment <your_comment> <song_ID>\n");
+    }
+    else{
+        if(text[0] != '<' || text[strlen(clientMessage)-1] != '>'){
+            strcpy(serverResponse,"Wrong format! add comment <your_comment> <song_ID>\n");
+        }
+        else{
+            strcpy(text,text+1);
+            k=0;
+
+            while(text[0]!='>'){ //comentariu
+                comment[k++]=text[0];
+                strcpy(text,text+1);
+            }
+
+            if(text[1] != ' ' || text[2] != '<'){
+                strcpy(serverResponse,"Wrong format! add comment <your_comment> <song_ID>\n");
+            }
+            else{
+                strcpy(text,text+3);
+                k=0;
+
+                while(text[0]!='>'){ //comentariu
+                    IDsong[k++]=text[0];
+                    strcpy(text,text+1);
+                }
+
+                if (strlen(comment) < 1 || strlen(IDsong) < 1){ // caz in care unul tin campuri <> este gol
+                    strcpy(serverResponse,"Wrong format! add comment <your_comment> <song_ID>\n");
+                }
+                else{ // adaugare comment
+                    char *zErrMsg = nullptr;
+                    char result[MAX_CHR];
+                    char sql[MAX_CHR];
+                    int rc;
+                    memset(result,0,sizeof(result));
+                    memset(sql,0,sizeof(sql));
+
+                    // verificam existenta melodiei
+                    sprintf(sql, "SELECT * FROM songs WHERE ID=%s;", IDsong);
+                    rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
+
+                    if( rc != SQLITE_OK ){
+                        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+                        sprintf(serverResponse, "There is no song with the ID: %s, or something went wrong.\n",clientMessage);
+                        sqlite3_free(zErrMsg);
+                    } else { //executare interogare pentru adaugare commentariu
+                        memset(sql,0,sizeof(sql));
+
+                        printf(sql, "INSERT INTO comments (ID, username, comment) VALUES (%s,'%s','%s');", IDsong,user,comment);
+                        rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
+
+                        if( rc != SQLITE_OK ){
+                            fprintf(stderr, "SQL error: %s\n", zErrMsg);
+                            strcpy(serverResponse, "Something went wrong. Try again!\n");
+                            sqlite3_free(zErrMsg);
+                        } else{
+                            strcpy(serverResponse, "Comment added! \n");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+}
+void see_top_general(sqlite3* db, char* serverResponse){
     char *zErrMsg = nullptr;
     char result[MAX_CHR];
     char sql[MAX_CHR];
@@ -317,31 +405,177 @@ int canvote(sqlite3* db,char* user){
     memset(result,0,sizeof(result));
     memset(sql,0,sizeof(sql));
 
-    printf(sql, "SELECT canvote FROM user WHERE username='%s';", user);
-    rc = sqlite3_exec(db, sql, callbackID, result, &zErrMsg);
+    sprintf(sql, "SELECT id, votes, titlu FROM songs WHERE votes != 0 ORDER BY votes desc;");
+    rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
 
+    if( rc != SQLITE_OK ){
+        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        strcpy(serverResponse, "Something went wrong. Try again!\n");
+        sqlite3_free(zErrMsg);
+    } else{
+        sprintf(serverResponse,"\nID\tVOTES\tTITLU\n\n%s",result);
+    }
+}
+void see_users_command(sqlite3* db,char* serverResponse){
+    char *zErrMsg = nullptr;
+    char result[MAX_CHR];
+    char sql[MAX_CHR];
+    int rc;
+    memset(result,0,sizeof(result));
+    memset(sql,0,sizeof(sql));
+
+    sprintf(sql, "SELECT username FROM user ORDER BY username asc;");
+    rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
+
+    if( rc != SQLITE_OK ){
+        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        strcpy(serverResponse, "Something went wrong. Try again!\n");
+        sqlite3_free(zErrMsg);
+    } else{
+        sprintf(serverResponse,"\nUSERNAMES\n\n%s",result);
+    }
+}
+void see_top_genre(sqlite3* db,char* clientMessage,char* serverResponse){
+    char *zErrMsg = nullptr;
+    char result[MAX_CHR];
+    char sql[MAX_CHR];
+    int rc;
+    memset(result,0,sizeof(result));
+    memset(sql,0,sizeof(sql));
+
+    sprintf(sql, "SELECT s.id, votes, titlu FROM songs s JOIN %s g ON g.id=s.id WHERE votes != 0 ORDER BY votes desc;", clientMessage);
+    rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
+
+    if( rc != SQLITE_OK ){
+        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        strcpy(serverResponse, "Something went wrong or wrong format. Try again! see to by chosen_genre\n");
+        sqlite3_free(zErrMsg);
+    } else{
+        sprintf(serverResponse,"\nID\tVOTES\tTITLU\n\n%s",result);
+    }
+}
+void see_genres_command(sqlite3* db,char* serverResponse){
+    char *zErrMsg = nullptr;
+    char result[MAX_CHR];
+    char sql[MAX_CHR];
+    int rc;
+    memset(result,0,sizeof(result));
+    memset(sql,0,sizeof(sql));
+
+    sprintf(sql, "SELECT genre FROM genres ORDER BY genre;");
+    rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
+
+    if( rc != SQLITE_OK ){
+        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        strcpy(serverResponse, "Something went wrong or wrong format. Try again! see genres\n");
+        sqlite3_free(zErrMsg);
+    } else{
+        sprintf(serverResponse,"\n GENRES \n\n%s",result);
+    }
+}
+int verify_vote_right(sqlite3* db,char user[100]){
+    char *zErrMsg = nullptr;
+    char result[MAX_CHR];
+    char sql[MAX_CHR];
+    int rc;
+    memset(result,0,sizeof(result));
+    memset(sql,0,sizeof(sql));
+    cout<<user<<'\n';
+    sprintf(sql, "SELECT canvote FROM user WHERE username='%s';", user);
+    rc = sqlite3_exec(db, sql, callbackID, result, &zErrMsg);
+    cout<<result<<"\n";
     if( rc != SQLITE_OK ){
         fprintf(stderr, "SQL error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
         return 0;
     }
     else
-    if (strstr("yes", result) != nullptr) return 1;
+    if (strcmp("yes", result) == 0) return 1;
     else return 0;
 
+}
+void erase_empty_tables(sqlite3* db){
+    char *zErrMsg = nullptr;
+    char result[MAX_CHR];
+    char sql[MAX_CHR];
+    char text[MAX_CHR];
+    char gen[100];
+    int rc;
+    int k;
+    memset(result,0,sizeof(result));
+    memset(text,0,sizeof(text));
+    memset(gen,0,sizeof(gen));
+    memset(sql,0,sizeof(sql));
+
+    sprintf(sql, "SELECT genre FROM genres;");
+    rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
+
+    if( rc != SQLITE_OK ){
+        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        sqlite3_free(zErrMsg);
+    } else{
+        strcpy(text,result);
+
+        while (strlen(text) > 0){
+            memset(result,0,sizeof(result));
+            memset(gen,0,sizeof(gen));
+            memset(sql,0,sizeof(sql));
+            k=0;
+
+            while(text[0] != '\n'){
+                gen[k++]=text[0];
+                strcpy(text,text+1);
+            }
+            strcpy(text,text+1);
+
+            if (strlen(gen)>0){
+                sprintf(sql, "SELECT * FROM %s;",gen);
+                rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
+
+                if( rc != SQLITE_OK ){
+                    fprintf(stderr, "SQL error: %s\n", zErrMsg);
+                    sqlite3_free(zErrMsg);
+                }
+                else
+                if(strlen(result) < 1) {
+                    memset(sql, 0, sizeof(sql));
+
+                    sprintf(sql, "DROP TABLE %s;",gen);
+                    printf("Am sters tabel\n");
+                    rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
+
+                    if (rc != SQLITE_OK) {
+                        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+                        sqlite3_free(zErrMsg);
+                    }
+                    else{
+                        memset(sql, 0, sizeof(sql));
+
+                        sprintf(sql, "DELETE FROM genres WHERE genre='%s';",gen);
+                        printf("Am sters o linie din tabelul genres\n");
+                        rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
+
+                        if (rc != SQLITE_OK) {
+                            fprintf(stderr, "SQL error: %s\n", zErrMsg);
+                            sqlite3_free(zErrMsg);
+                        }
+                    }
+
+                }
+            }
+        }
+    }
 }
 
 // not in main
 static int callback(void *NowUsed, int argc, char **argv, char **azColName){
     char* data= (char*) NowUsed;
     for(int i = 0; i<argc; i++) {
-        strcat(data,azColName[i]);
-        strcat(data," : ");
         strcat(data,argv[i] ? argv[i] : "NULL");
-        strcat (data, "\n");
+        strcat (data, "\t");
         printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
     }
-    strcat(data,"\n");
+    strcat (data, "\n");
     return 0;
 }
 static int callbackInsert(void *NotUsed, int argc, char **argv, char **azColName) {
@@ -355,6 +589,7 @@ static int callbackID(void *NowUsed, int argc, char **argv, char **azColName) {
     char* data= (char*) NowUsed;
     for(int i = 0; i<argc; i++) {
         strcat(data,argv[i] ? argv[i] : "NULL");
+        printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL"); // de sters
     }
     return 0;
 }
@@ -369,8 +604,9 @@ void addInGenre(sqlite3* db,char ID[MAX_CHR],char genuri[200],char* serverRespon
     char sql[MAX_CHR];
     int rc;
 
-    char* pointer=strtok(genuri,", ");
+    char* pointer=strtok(genuri,",");
     while(pointer != nullptr){
+        printf("gen: '%s'\n",pointer);
         memset(sql,0,sizeof(sql));
         sprintf(sql, "SELECT * FROM %s;",pointer);
         rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
@@ -386,13 +622,33 @@ void addInGenre(sqlite3* db,char ID[MAX_CHR],char genuri[200],char* serverRespon
                          ");\n"
                          "\n"
                          "create unique index %s_ID_uindex\n"
-                         "\ton %s (ID);",pointer,pointer,pointer);
+                         "\ton %s (ID);\n"
+                         "\n"
+                         "INSERT INTO genres (genre) VALUES ('%s');",pointer,pointer,pointer,pointer);
             rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
             if( rc != SQLITE_OK ){
                 fprintf(stderr, "SQL error: %s\n", zErrMsg);
                 sprintf(serverResponse, "Can't add new genre called %s.\n",pointer);
                 sqlite3_free(zErrMsg);
             }
+            else
+            {
+                memset(sql,0,sizeof(sql));
+
+                sprintf(sql, "INSERT INTO %s (id) VALUES (%s);",pointer,ID);
+                rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
+
+                if( rc != SQLITE_OK ){
+                    fprintf(stderr, "SQL error: %s\n", zErrMsg);
+                    sprintf(serverResponse, "Can't add the song in the genre called %s.\n",pointer);
+                    sqlite3_free(zErrMsg);
+                }
+                else{
+                    printf("Adaugat in baza de date cu succes\n");
+                    strcpy(serverResponse, "Song added!\n");
+                }
+            }
+
         }
         else{ // add in database tabel
             memset(sql,0,sizeof(sql));
@@ -410,6 +666,6 @@ void addInGenre(sqlite3* db,char ID[MAX_CHR],char genuri[200],char* serverRespon
                 strcpy(serverResponse, "Song added!\n");
             }
         }
-        pointer=strtok(NULL,", ");
+        pointer=strtok(nullptr,",");
     }
 }
