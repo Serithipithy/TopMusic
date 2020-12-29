@@ -201,6 +201,7 @@ int main ()
                         {
                         strcpy(clientMessage, clientMessage + strlen("delete song "));
                         deleteSongCommand(db,clientMessage,serverResponse);
+                        erase_empty_tables(db); // stergerea tabelelor cu genuri goale
                     }
                 }
                 else
@@ -379,8 +380,6 @@ int main ()
                 }
                 else
                     strcpy(serverResponse, "Wrong format or nonexistent command. Try again!\n"); // no known command
-
-                erase_empty_tables(db); // stergerea tabelelor cu genuri goale
 
                 /* returnam mesajul clientului */
                 if (write(client, serverResponse, strlen(serverResponse)) <= 0) {

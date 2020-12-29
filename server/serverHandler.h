@@ -24,6 +24,7 @@ int verify_vote_right(sqlite3* db,char user[100]);
 void erase_empty_tables(sqlite3* db);
 // not in main
 static int callback(void *NowUsed, int argc, char **argv, char **azColName); // cu returnare rezultat
+static int callbackUsers(void *NowUsed, int argc, char **argv, char **azColName);
 static int callbackInsert(void *NotUsed, int argc, char **argv, char **azColName); // fara returnare rezultat
 static int callbackID(void *NowUsed, int argc, char **argv, char **azColName); // pentru a luat ID-ul melodiei
 

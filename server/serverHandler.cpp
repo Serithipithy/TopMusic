@@ -125,7 +125,7 @@ void registerCommand(sqlite3* db, int &adminORuser,char* serverResponse,const ch
     memset(result,0,sizeof(result));
     memset(sql,0,sizeof(sql));
 
-    sprintf(sql, "INSERT INTO users (username, canvote) VALUES ('%s','yes');", clientMessage);
+    sprintf(sql, "INSERT INTO user (username, canvote) VALUES ('%s','yes');", clientMessage);
     rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
 
     if( rc != SQLITE_OK ){
@@ -380,7 +380,7 @@ void addCommentCommand(sqlite3* db,char* clientMessage,char* serverResponse,char
                     } else { //executare interogare pentru adaugare commentariu
                         memset(sql,0,sizeof(sql));
 
-                        printf(sql, "INSERT INTO comments (ID, username, comment) VALUES (%s,'%s','%s');", IDsong,user,comment);
+                        sprintf(sql, "INSERT INTO comments (ID, username, comment) VALUES (%s,'%s','%s');", IDsong,user,comment);
                         rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
 
                         if( rc != SQLITE_OK ){
@@ -405,7 +405,7 @@ void see_top_general(sqlite3* db, char* serverResponse){
     memset(result,0,sizeof(result));
     memset(sql,0,sizeof(sql));
 
-    sprintf(sql, "SELECT id, votes, titlu FROM songs WHERE votes != 0 ORDER BY votes desc;");
+    sprintf(sql, "SELECT id, votes, titlu FROM songs ORDER BY votes desc;");
     rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
 
     if( rc != SQLITE_OK ){
@@ -424,15 +424,15 @@ void see_users_command(sqlite3* db,char* serverResponse){
     memset(result,0,sizeof(result));
     memset(sql,0,sizeof(sql));
 
-    sprintf(sql, "SELECT username FROM user ORDER BY username asc;");
-    rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
+    sprintf(sql, "SELECT canvote, username FROM user ORDER BY username asc;");
+    rc = sqlite3_exec(db, sql, callbackUsers, result, &zErrMsg);
 
     if( rc != SQLITE_OK ){
         fprintf(stderr, "SQL error: %s\n", zErrMsg);
         strcpy(serverResponse, "Something went wrong. Try again!\n");
         sqlite3_free(zErrMsg);
     } else{
-        sprintf(serverResponse,"\nUSERNAMES\n\n%s",result);
+        sprintf(serverResponse,"\nCAN VOTE?\tUSERNAMES\n\n%s",result);
     }
 }
 void see_top_genre(sqlite3* db,char* clientMessage,char* serverResponse){
@@ -573,6 +573,16 @@ static int callback(void *NowUsed, int argc, char **argv, char **azColName){
     for(int i = 0; i<argc; i++) {
         strcat(data,argv[i] ? argv[i] : "NULL");
         strcat (data, "\t");
+        printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+    }
+    strcat (data, "\n");
+    return 0;
+}
+static int callbackUsers(void *NowUsed, int argc, char **argv, char **azColName){
+    char* data= (char*) NowUsed;
+    for(int i = 0; i<argc; i++) {
+        strcat(data,argv[i] ? argv[i] : "NULL");
+        strcat (data, "\t\t");
         printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
     }
     strcat (data, "\n");
