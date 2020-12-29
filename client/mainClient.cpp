@@ -20,8 +20,8 @@ int main (int argc, char *argv[])
 {
     int sd;			// descriptorul de socket
     struct sockaddr_in server;	// structura folosita pentru conectare
-    char msgToSend[400];		// mesajul trimis
-    char msgRead[400];          // mesajul citit
+    char msgToSend[2048];		// mesajul trimis
+    char msgRead[2048];          // mesajul citit
 
     /* exista toate argumentele in linia de comanda? */
     if (argc != 3){
@@ -54,27 +54,28 @@ int main (int argc, char *argv[])
     // TODO :mesaj de intampinare
     while(1) {
         // citire comanda client
-        bzero (msgToSend, 400);
+        bzero (msgToSend, 2048);
         printf ("::: ");
         fflush (stdout);
-        read (0, msgToSend, 400);
+        read (0, msgToSend, 2048);
         msgToSend[strlen(msgToSend)-1]='\0';
 
         // trimitere mesaj catre server
-        if (write (sd, msgToSend, 400) <= 0){
+        if (write (sd, msgToSend, 2048) <= 0){
             perror ("[client]Eroare la write() spre server.\n");
             return errno;
         }
 
         // asteapta pana cand primeste raspuns/mesaj de la server
-        bzero(msgRead,400);
-        if (read (sd, msgRead, 400) < 0){
+        bzero(msgRead,2048);
+        if (read (sd, msgRead, 2048) < 0){
             perror ("[client]Eroare la read() de la server.\n");
             return errno;
         }
 
         // afisare mesaj trimis de catre server
         printf (">> %s\n", msgRead);
+        fflush(stdout);
         if (strcmp(msgRead,"Quit!\n") == 0) {
             break;
         }
