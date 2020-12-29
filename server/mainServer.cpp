@@ -10,7 +10,7 @@
 #include <sqlite3.h>
 
 /* portul folosit */
-#define PORT 2021
+#define PORT 2022
 #define MAX_CHR 2048
 /* codul de eroare returnat de anumite apeluri */
 extern int errno;
@@ -39,7 +39,7 @@ int main ()
     struct sockaddr_in server{};	// structura folosita de server
     struct sockaddr_in from{};
     char clientMessage[MAX_CHR];		          //mesajul primit de la client
-    char serverResponse[MAX_CHR]=" ";        //mesaj de raspuns pentru client
+    char serverResponse[MAX_CHR];        //mesaj de raspuns pentru client
     int sd;			//descriptorul de socket
     // conectare la baza de date
     char *zErrMsg = nullptr;
@@ -125,7 +125,7 @@ int main ()
         if( pid == 0 ) { // procesul copil
             int adminORuser=0;
             int command;
-            char *user = nullptr;
+            char loggedIn[100];
 
             while (true) {
                 /* s-a realizat conexiunea, se astepta mesajul */
@@ -157,7 +157,10 @@ int main ()
                         printf("%s\n",clientMessage);
                         memset(sql,0,sizeof(sql));
                         sprintf(sql, "SELECT username FROM user WHERE username like '%s';", clientMessage);
-                        loginCommand(db,sql,adminORuser,serverResponse,clientMessage,2,user);
+                        loginCommand(db,sql,adminORuser,serverResponse,clientMessage,2);
+                        if (strcmp("Logged in!\n",serverResponse) == 0)
+                            strcpy(loggedIn,clientMessage);
+                        fprintf(stderr,"%s\n",loggedIn);
                     } else {
                         strcpy(serverResponse, "Already logged in!\n");
                     }
@@ -169,7 +172,7 @@ int main ()
                         printf("[server]%s\n", clientMessage);
                         memset(sql,0,sizeof(sql));
                         sprintf(sql, "SELECT * FROM admins WHERE username='%s';", clientMessage);
-                        loginCommand(db,sql,adminORuser,serverResponse,clientMessage,1,user);
+                        loginCommand(db,sql,adminORuser,serverResponse,clientMessage,1);
                     } else {
                      strcpy(serverResponse, "Already logged in!\n");
                     }
@@ -246,7 +249,7 @@ int main ()
                     }
                     else {
                         strcpy(clientMessage, clientMessage + strlen("vote song "));
-                        if(canvote(db,user) == 1)
+                        if(verify_vote_right(db,loggedIn) == 1)
                             voteSongCommand(db,clientMessage,serverResponse);
                         else{
                             strcpy(serverResponse,"You can't vote right now because an admin took this right from you.\n");
@@ -257,25 +260,127 @@ int main ()
                 }
                 else
                 if( command == 9 ){
-                    strcpy(clientMessage, clientMessage + strlen("add comment "));
+                    if (adminORuser == 0){      // in cazul in care nu este conectat niciun fel de utilizator
+                        strcpy(serverResponse, "Login first!\n");
+                    }
+                    else
+                    if(adminORuser == 1){
+                        strcpy(serverResponse,"You don't have the permission to use this command.\n");
+                    }
+                    else {
+                        strcpy(clientMessage, clientMessage + strlen("add comment ")); // add comment <comment> <ID>
+                        addCommentCommand(db,clientMessage,serverResponse,loggedIn);
+                    }
                     // add comm
                 }
                 else
-                if( command == 10 ){
-                    strcpy(clientMessage, clientMessage + strlen("see top general "));
-                    // see top general
+                if( command == 10 ){ // see top by genre
+                    if( adminORuser == 0){
+                        strcpy(serverResponse, "Login first!\n");
+                    }
+                    else
+                    if( adminORuser == 1){
+                        strcpy(serverResponse, "You don't have the permission to use this command.\n");
+                    }
+                    else{
+                        strcpy(clientMessage, clientMessage + strlen("see top by "));
+                        if (strlen(clientMessage) < 1){
+                            strcpy(serverResponse,"Wrong format! see top by choose_genre\n");
+                        }
+                        else
+                            see_top_genre(db,clientMessage, serverResponse);
+                    }
                 }
                 else
-                if( command == 11 ){
-                    strcpy(clientMessage, clientMessage + strlen("see top by "));
-                    // see top by genre
+                if( command == 11 ){ // see top general
+                    if ( adminORuser == 0 ){
+                        strcpy(serverResponse, "Login first!\n");
+                    }
+                    else {
+                        strcpy(clientMessage, clientMessage + strlen("see top general "));
+                        if (strlen(clientMessage) > 0){
+                            strcpy(serverResponse,"Wrong format! see top general\n");
+                        }
+                        else
+                            see_top_general(db, serverResponse);
+                    }
                 }
                 else
-                if ( command == 12 ){
-                    strcpy(clientMessage, clientMessage + strlen("see users "));
+                if( command == 12 ){
+                    if ( adminORuser == 0 ){
+                        strcpy(serverResponse, "Login first!\n");
+                    }
+                    else
+                        if (adminORuser == 1) {
+                        strcpy(clientMessage, clientMessage + strlen("see users "));
+                            if (strlen(clientMessage) > 0){
+                                strcpy(serverResponse,"Wrong format! see users\n");
+                            }
+                            else {
+                                see_users_command(db, serverResponse);
+                            }
+                        }
+                        else{
+                            strcpy(serverResponse, "You don't have the permission to use this command.\n");
+                        }
                     // see users
                 }
-                else strcpy(serverResponse, "Wrong format or inexistent command. Try again!\n"); // no known command
+                else
+                if( command == 13 ){ // help
+                    if ( adminORuser == 0 )
+                        strcpy(serverResponse,"\n\tCommands available:\n"
+                                              "1. help \t\t\t\\\\will show you what commands you can execute while not logged or logged as user or admin\n"
+                                              "2. login user your_username \t\\\\if you want to login as an user\n"
+                                              "3. login admin your_username \t\\\\if you want to login as an admin\n"
+                                              "4. register your_new_username \t\\\\will create a new username\n");
+                    else
+                        if( adminORuser == 2 )
+                            strcpy(serverResponse,"\n\tCommands available for users:\n"
+                                                  "1. help \t\t\t\t\t\t\\\\will show you what commands you can execute while not logged or logged as user or admin\n"
+                                                  "2. add song <title> <description> <link> <genre(s)> \t\\\\you can add a new song to the top (between genres you need to use ',')\n"
+                                                  "3. vote song id_song \t\t\t\t\t\\\\you can vote a song based on its id if you have the privilege\n"
+                                                  "4. add comment <your_comment> <song_ID> \t\t\\\\you can add a comment to a song based on its id\n"
+                                                  "5. see top general \t\t\t\t\t\\\\will show you the general top based on votes\n"
+                                                  "6. see to by chosen_genre \t\t\t\t\\\\will show you the top based on a genre and votes\n"
+                                                  "7. see genres \t\t\t\t\t\t\\\\will show you the genres that exist in the database\n"
+                                                  "8. logout \t\t\t\t\t\t\\\\will log you out\n");
+                        else
+                            strcpy(serverResponse,"\n\tCommands available for admins:\n"
+                                                  "1. help \t\t\t\t\t\\\\will show you what commands you can execute while not logged or logged as user or admin\n"
+                                                  "2. see top general \t\t\t\t\\\\will show you the general top based on votes\n"
+                                                  "3. delete song id_song \t\t\t\t\\\\will delete the song with the id given if exists\n"
+                                                  "4. see users \t\t\t\t\t\\\\will show you the list of usernames\n"
+                                                  "5. restrict vote for chosen_username yes/no \t\\\\will change the right to vote of the chosen user\n"
+                                                  "6. logout \t\t\t\t\t\\\\will log you out\n");
+                }
+                else
+                if( command == 14 ){
+                    if ( adminORuser == 0 ){
+                        strcpy(serverResponse,"Your are not logged in yet.\n");
+                    }
+                    else{
+                        adminORuser=0;
+                        memset(loggedIn,0, sizeof(loggedIn));
+                        strcpy(serverResponse,"Logout! See you next time.\n");
+                    }
+                }
+                else
+                if( command == 15 ){ // see genres
+                    if ( adminORuser == 0 ){
+                        strcpy(serverResponse, "Login first!\n");
+                    }
+                    else
+                        if ( adminORuser == 1 ){
+                            strcpy(serverResponse, "You don't have the permission to use this command.\n");
+                        } // doar pe cele care au ceva in ele
+                        else{
+                            see_genres_command(db,serverResponse);
+                        }
+                }
+                else
+                    strcpy(serverResponse, "Wrong format or nonexistent command. Try again!\n"); // no known command
+
+                erase_empty_tables(db); // stergerea tabelelor cu genuri goale
 
                 /* returnam mesajul clientului */
                 if (write(client, serverResponse, strlen(serverResponse)) <= 0) {
@@ -288,7 +393,6 @@ int main ()
                     close(client);
                     break;
                 }
-
             }
             exit(0);
         }
