@@ -19,7 +19,9 @@ void addCommentCommand(sqlite3* db,char* clientMessage,char* serverResponse,char
 void see_top_general(sqlite3* db, char* serverResponse);
 void see_users_command(sqlite3* db,char* clientMessage);
 void see_top_genre(sqlite3* db,char* clientMessage,char* serverResponse);
+void see_comments(sqlite3* db,char* clientMessage,char* serverResponse);
 void see_genres_command(sqlite3* db,char* serverResponse);
+void see_details(sqlite3* db,char* clientMessage,char* serverResponse);
 int verify_vote_right(sqlite3* db,char user[100]);
 void erase_empty_tables(sqlite3* db);
 // not in main
@@ -27,6 +29,7 @@ static int callback(void *NowUsed, int argc, char **argv, char **azColName); // 
 static int callbackUsers(void *NowUsed, int argc, char **argv, char **azColName);
 static int callbackInsert(void *NotUsed, int argc, char **argv, char **azColName); // fara returnare rezultat
 static int callbackID(void *NowUsed, int argc, char **argv, char **azColName); // pentru a luat ID-ul melodiei
+static int callbackDetails(void *NowUsed, int argc, char **argv, char **azColName);
 
 int numberofappearances(char text[MAX_CHR], char character);
 void addInGenre(sqlite3* db,char ID[MAX_CHR],char genuri[200],char* serverResponse);

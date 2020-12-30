@@ -53,6 +53,8 @@ int getCommand ( const char* message ){
     char help[]="help";
     char logout[]="logout";
     char seegenres[]="see genres";
+    char seecomments[]="see comments for song";
+    char seedetails[]="see details for song";
 
     if(strstr( message, quit) != nullptr) return 1;
     else
@@ -83,6 +85,10 @@ int getCommand ( const char* message ){
     if(strstr(message,logout) != nullptr && strlen(message) == strlen(logout)) return 14;
     else
     if(strstr(message,seegenres) != nullptr && strlen(message) == strlen(seegenres)) return 15;
+    else
+    if(strstr(message,seecomments) != nullptr) return 16;
+    else
+    if(strstr(message,seedetails) != nullptr) return 17;
     else return 0;
 }
 void getUserName(const char *str, char username[100]){
@@ -473,6 +479,49 @@ void see_genres_command(sqlite3* db,char* serverResponse){
         sprintf(serverResponse,"\n GENRES \n\n%s",result);
     }
 }
+void see_comments(sqlite3* db,char* clientMessage,char* serverResponse){
+    char *zErrMsg = nullptr;
+    char result[MAX_CHR];
+    char sql[MAX_CHR];
+    int rc;
+    memset(result,0,sizeof(result));
+    memset(sql,0,sizeof(sql));
+
+    sprintf(sql, "SELECT username, comment FROM comments WHERE id=%s;",clientMessage);
+    rc = sqlite3_exec(db, sql, callbackDetails, result, &zErrMsg);
+
+    if( rc != SQLITE_OK ){
+        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        strcpy(serverResponse, "Something went wrong or wrong format. Try again! see comments for song id_song\n");
+        sqlite3_free(zErrMsg);
+    } else{
+        if(strlen(result) > 0) {
+            result[strlen(result)-1]='\0';
+            sprintf(serverResponse, "\n\t COMMENTS \n\n%s\n", result);
+        } else{
+            sprintf(serverResponse, "There are no comments for this song\n");
+        }
+    }
+}
+void see_details(sqlite3* db,char* clientMessage,char* serverResponse){
+    char *zErrMsg = nullptr;
+    char result[MAX_CHR];
+    char sql[MAX_CHR];
+    int rc;
+    memset(result,0,sizeof(result));
+    memset(sql,0,sizeof(sql));
+
+    sprintf(sql, "SELECT titlu, descriere, link, votes FROM songs WHERE id=%s;",clientMessage);
+    rc = sqlite3_exec(db, sql, callbackDetails, result, &zErrMsg);
+
+    if( rc != SQLITE_OK ){
+        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        strcpy(serverResponse, "Something went wrong or wrong format. Try again! see details for song id_song\n");
+        sqlite3_free(zErrMsg);
+    } else{
+            sprintf(serverResponse, "\n\tDETAILS \n\n%s", result);
+    }
+}
 int verify_vote_right(sqlite3* db,char user[100]){
     char *zErrMsg = nullptr;
     char result[MAX_CHR];
@@ -601,6 +650,18 @@ static int callbackID(void *NowUsed, int argc, char **argv, char **azColName) {
         strcat(data,argv[i] ? argv[i] : "NULL");
         printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL"); // de sters
     }
+    return 0;
+}
+static int callbackDetails(void *NowUsed, int argc, char **argv, char **azColName){
+    char* data= (char*) NowUsed;
+    for(int i = 0; i<argc; i++) {
+        strcat(data , azColName[i]);
+        strcat (data, " : ");
+        strcat(data,argv[i] ? argv[i] : "NULL");
+        strcat(data,"\n");
+        printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+    }
+    strcat (data, "\n");
     return 0;
 }
 int numberofappearances(char text[MAX_CHR], char character){ // numarul de aparitii ale unui caracter

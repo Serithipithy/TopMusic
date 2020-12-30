@@ -333,7 +333,8 @@ int main ()
                                               "1. help \t\t\t\\\\will show you what commands you can execute while not logged or logged as user or admin\n"
                                               "2. login user your_username \t\\\\if you want to login as an user\n"
                                               "3. login admin your_username \t\\\\if you want to login as an admin\n"
-                                              "4. register your_new_username \t\\\\will create a new username\n");
+                                              "4. register your_new_username \t\\\\will create a new username\n"
+                                              "5. quit\t\t\t\t\\\\will close the application\n");
                     else
                         if( adminORuser == 2 )
                             strcpy(serverResponse,"\n\tCommands available for users:\n"
@@ -344,7 +345,10 @@ int main ()
                                                   "5. see top general \t\t\t\t\t\\\\will show you the general top based on votes\n"
                                                   "6. see to by chosen_genre \t\t\t\t\\\\will show you the top based on a genre and votes\n"
                                                   "7. see genres \t\t\t\t\t\t\\\\will show you the genres that exist in the database\n"
-                                                  "8. logout \t\t\t\t\t\t\\\\will log you out\n");
+                                                  "8. see comments for song id_song \t\t\t\\\\will show the comments for the chosen song\n"
+                                                  "9. see details for song id_song \t\t\t\\\\will show the details for the chosen song\n"
+                                                  "10. logout \t\t\t\t\t\t\\\\will log you out\n"
+                                                  "11. quit\t\t\t\t\t\t\\\\will close the application\n");
                         else
                             strcpy(serverResponse,"\n\tCommands available for admins:\n"
                                                   "1. help \t\t\t\t\t\\\\will show you what commands you can execute while not logged or logged as user or admin\n"
@@ -352,10 +356,13 @@ int main ()
                                                   "3. delete song id_song \t\t\t\t\\\\will delete the song with the id given if exists\n"
                                                   "4. see users \t\t\t\t\t\\\\will show you the list of usernames\n"
                                                   "5. restrict vote for chosen_username yes/no \t\\\\will change the right to vote of the chosen user\n"
-                                                  "6. logout \t\t\t\t\t\\\\will log you out\n");
+                                                  "6. see comments for song id_song \t\t\\\\will show the comments for the chosen song\n"
+                                                  "7. see details for song id_song \t\t\\\\will show the details for the chosen song\n"
+                                                  "8. logout \t\t\t\t\t\\\\will log you out\n"
+                                                  "9. quit\t\t\t\t\t\t\\\\will close the application\n");
                 }
                 else
-                if( command == 14 ){
+                if( command == 14 ){ // logout
                     if ( adminORuser == 0 ){
                         strcpy(serverResponse,"Your are not logged in yet.\n");
                     }
@@ -377,6 +384,36 @@ int main ()
                         else{
                             see_genres_command(db,serverResponse);
                         }
+                }
+                else
+                if( command == 16 ){ // see comments
+                    if ( adminORuser == 0 ){
+                        strcpy(serverResponse,"Your are not logged in yet.\n");
+                    }
+                    else{
+                        strcpy(clientMessage, clientMessage + strlen("see comments for song "));
+                        if (strlen(clientMessage) < 1){
+                            strcpy(serverResponse,"Wrong format! see comments for song id_song\n");
+                        }
+                        else{
+                            see_comments(db,clientMessage,serverResponse);
+                        }
+                    }
+                }
+                else
+                if( command == 17 ){ // see details
+                    if ( adminORuser == 0 ){
+                        strcpy(serverResponse,"Your are not logged in yet.\n");
+                    }
+                    else{
+                        strcpy(clientMessage, clientMessage + strlen("see details for song "));
+                        if (strlen(clientMessage) < 1){
+                            strcpy(serverResponse,"Wrong format! see details for song id_song\n");
+                        }
+                        else{
+                            see_details(db,clientMessage,serverResponse);
+                        }
+                    }
                 }
                 else
                     strcpy(serverResponse, "Wrong format or nonexistent command. Try again!\n"); // no known command
