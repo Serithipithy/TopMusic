@@ -10,7 +10,7 @@
 #include <sqlite3.h>
 
 /* portul folosit */
-#define PORT 2022
+#define PORT 2023
 #define MAX_CHR 2048
 /* codul de eroare returnat de anumite apeluri */
 extern int errno;
@@ -201,7 +201,7 @@ int main ()
                         {
                         strcpy(clientMessage, clientMessage + strlen("delete song "));
                         deleteSongCommand(db,clientMessage,serverResponse);
-                        erase_empty_tables(db); // stergerea tabelelor cu genuri goale
+                        erase_empty_tables(db);
                     }
                 }
                 else
@@ -245,7 +245,7 @@ int main ()
                         strcpy(serverResponse, "Login first!\n");
                     }
                     else
-                    if(adminORuser == 1){
+                    if(adminORuser == 1){ // vote song
                         strcpy(serverResponse,"You don't have the permission to use this command.\n");
                     }
                     else {
@@ -257,10 +257,9 @@ int main ()
                         }
 
                     }
-                    // vote song
                 }
                 else
-                if( command == 9 ){
+                if( command == 9 ){ // add comments
                     if (adminORuser == 0){      // in cazul in care nu este conectat niciun fel de utilizator
                         strcpy(serverResponse, "Login first!\n");
                     }
@@ -272,7 +271,6 @@ int main ()
                         strcpy(clientMessage, clientMessage + strlen("add comment ")); // add comment <comment> <ID>
                         addCommentCommand(db,clientMessage,serverResponse,loggedIn);
                     }
-                    // add comm
                 }
                 else
                 if( command == 10 ){ // see top by genre
@@ -307,7 +305,7 @@ int main ()
                     }
                 }
                 else
-                if( command == 12 ){
+                if( command == 12 ){ //see users
                     if ( adminORuser == 0 ){
                         strcpy(serverResponse, "Login first!\n");
                     }
@@ -324,7 +322,6 @@ int main ()
                         else{
                             strcpy(serverResponse, "You don't have the permission to use this command.\n");
                         }
-                    // see users
                 }
                 else
                 if( command == 13 ){ // help
@@ -417,7 +414,7 @@ int main ()
                 }
                 else
                     strcpy(serverResponse, "Wrong format or nonexistent command. Try again!\n"); // no known command
-
+                //erase_empty_tables(db); // stergerea tabelelor cu genuri goale
                 /* returnam mesajul clientului */
                 if (write(client, serverResponse, strlen(serverResponse)) <= 0) {
                     perror("[server]Eroare la write() catre client.\n");

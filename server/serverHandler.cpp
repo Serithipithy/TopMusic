@@ -449,7 +449,7 @@ void see_top_genre(sqlite3* db,char* clientMessage,char* serverResponse){
     memset(result,0,sizeof(result));
     memset(sql,0,sizeof(sql));
 
-    sprintf(sql, "SELECT s.id, votes, titlu FROM songs s JOIN %s g ON g.id=s.id WHERE votes != 0 ORDER BY votes desc;", clientMessage);
+    sprintf(sql, "SELECT s.id, votes, titlu FROM songs s JOIN %s g ON g.id=s.id ORDER BY votes desc;", clientMessage);
     rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
 
     if( rc != SQLITE_OK ){
@@ -557,7 +557,7 @@ void erase_empty_tables(sqlite3* db){
     memset(sql,0,sizeof(sql));
 
     sprintf(sql, "SELECT genre FROM genres;");
-    rc = sqlite3_exec(db, sql, callback, result, &zErrMsg);
+    rc = sqlite3_exec(db, sql, callbackDelete, result, &zErrMsg);
 
     if( rc != SQLITE_OK ){
         fprintf(stderr, "SQL error: %s\n", zErrMsg);
@@ -584,6 +584,16 @@ void erase_empty_tables(sqlite3* db){
                 if( rc != SQLITE_OK ){
                     fprintf(stderr, "SQL error: %s\n", zErrMsg);
                     sqlite3_free(zErrMsg);
+                    memset(sql, 0, sizeof(sql));
+
+                    sprintf(sql, "DELETE FROM genres WHERE genre='%s';",gen);
+                    rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
+
+                    if (rc != SQLITE_OK) {
+                        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+                        sqlite3_free(zErrMsg);
+                    }
+                    else printf("Am sters o linie din tabelul genres\n");
                 }
                 else
                 if(strlen(result) < 1) {
@@ -601,13 +611,13 @@ void erase_empty_tables(sqlite3* db){
                         memset(sql, 0, sizeof(sql));
 
                         sprintf(sql, "DELETE FROM genres WHERE genre='%s';",gen);
-                        printf("Am sters o linie din tabelul genres\n");
                         rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
 
                         if (rc != SQLITE_OK) {
                             fprintf(stderr, "SQL error: %s\n", zErrMsg);
                             sqlite3_free(zErrMsg);
                         }
+                        else printf("Am sters o linie din tabelul genres\n");
                     }
 
                 }
@@ -622,6 +632,15 @@ static int callback(void *NowUsed, int argc, char **argv, char **azColName){
     for(int i = 0; i<argc; i++) {
         strcat(data,argv[i] ? argv[i] : "NULL");
         strcat (data, "\t");
+        printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+    }
+    strcat (data, "\n");
+    return 0;
+}
+static int callbackDelete(void *NowUsed, int argc, char **argv, char **azColName){
+    char* data= (char*) NowUsed;
+    for(int i = 0; i<argc; i++) {
+        strcat(data,argv[i] ? argv[i] : "NULL");
         printf("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
     }
     strcat (data, "\n");
