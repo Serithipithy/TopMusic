@@ -115,7 +115,7 @@ void registerCommand(sqlite3 *db, int &adminORuser, char *serverResponse, const 
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL error: %s\n", zErrMsg);
         strcpy(serverResponse,
-               "Can't create an account with this username because this username already exists. Login or try again!\n");
+               "Can't create an account with this username because it already exists. Login or try again!\n");
         sqlite3_free(zErrMsg);
     } else {
         strcpy(serverResponse, "Successful registration!\n");
@@ -177,9 +177,9 @@ void addSongCommand(sqlite3 *db, const char *clientMessage, char *serverResponse
                     }
                     printf("%s\n", genuri);
                     if (strlen(titlu) < 1 || strlen(descriere) < 1 || strlen(link) < 1 || strlen(genuri) < 1) {
-                        printf("%zu, %zu, %zu, %zu\n", strlen(titlu), strlen(descriere), strlen(link), strlen(genuri));
+                        //printf("%zu, %zu, %zu, %zu\n", strlen(titlu), strlen(descriere), strlen(link), strlen(genuri));
                         strcpy(serverResponse,
-                               "Wrong format! One of the atributes is empty. add song <title> <description> <link> <genre(s)>\n");
+                               "Wrong format! One of the attributes is empty. add song <title> <description> <link> <genre(s)>\n");
                     } else { // adaugare in baza de date
                         char *zErrMsg = nullptr;
                         char result[MAX_CHR];
@@ -203,7 +203,7 @@ void addSongCommand(sqlite3 *db, const char *clientMessage, char *serverResponse
                             if (rc != SQLITE_OK) {
                                 fprintf(stderr, "SQL error: %s\n", zErrMsg);
                                 strcpy(serverResponse,
-                                       "An error has accured while trying to add in genre(s) database.\n");
+                                       "An error occurred while trying to add in genre(s) database.\n");
                                 sqlite3_free(zErrMsg);
                             } else {
                                 addInGenre(db, result, genuri, serverResponse);
@@ -269,6 +269,7 @@ void deleteSongCommand(sqlite3 *db, char *clientMessage, char *serverResponse) {
 
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        strcpy(serverResponse, "Something went wrong. Try again!\n");
         sqlite3_free(zErrMsg);
     } else {
         if (strstr(clientMessage, result) != nullptr) {
@@ -283,7 +284,7 @@ void deleteSongCommand(sqlite3 *db, char *clientMessage, char *serverResponse) {
                 strcpy(serverResponse, "Something went wrong. Try again!\n");
                 sqlite3_free(zErrMsg);
             }
-            sprintf(serverResponse, "The song with the ID:%s was deleted!\n", clientMessage);
+            sprintf(serverResponse, "The song with the ID: %s was deleted!\n", clientMessage);
         }
     }
 }
@@ -436,7 +437,7 @@ void see_top_genre(sqlite3 *db, char *clientMessage, char *serverResponse) {
 
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL error: %s\n", zErrMsg);
-        strcpy(serverResponse, "Something went wrong or wrong format. Try again! see to by chosen_genre\n");
+        strcpy(serverResponse, "Something went wrong or wrong format. Try again! see top by chosen_genre\n");
         sqlite3_free(zErrMsg);
     } else {
         sprintf(serverResponse, "\nID\tVOTES\tTITLU\n\n%s", result);
@@ -577,12 +578,12 @@ void erase_empty_tables(sqlite3 *db) {
                     if (rc != SQLITE_OK) {
                         fprintf(stderr, "SQL error: %s\n", zErrMsg);
                         sqlite3_free(zErrMsg);
-                    } else printf("Am sters o linie din tabelul genres\n");
+                    } else printf("Aline from table genres was deleted\n");
                 } else if (strlen(result) < 1) {
                     memset(sql, 0, sizeof(sql));
 
                     sprintf(sql, "DROP TABLE %s;", gen);
-                    printf("Am sters tabel\n");
+                    printf("A table was erased\n");
                     rc = sqlite3_exec(db, sql, callbackInsert, 0, &zErrMsg);
 
                     if (rc != SQLITE_OK) {
@@ -680,8 +681,9 @@ void addInGenre(sqlite3 *db, char ID[MAX_CHR], char genuri[200], char *serverRes
     char *zErrMsg = nullptr;
     char sql[MAX_CHR];
     int rc;
+    char *pointer= nullptr;
 
-    char *pointer = strtok(genuri, ",");
+    pointer = strtok(genuri, ",");
     while (pointer != nullptr) {
         printf("gen: '%s'\n", pointer);
         memset(sql, 0, sizeof(sql));

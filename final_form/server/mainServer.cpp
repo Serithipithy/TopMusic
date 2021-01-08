@@ -13,7 +13,6 @@
 #define PORT 2023
 #define MAX_CHR 2048
 
-/* codul de eroare returnat de anumite apeluri */
 extern int errno;
 
 sqlite3 *db;
@@ -136,7 +135,7 @@ int main() {
                 } else if (command == 2) { // login user
                     if (adminORuser == 0) {
                         strcpy(clientMessage, clientMessage + strlen("login user "));
-                        printf("%s\n", clientMessage);
+                        printf("[server]%s\n", clientMessage);
                         memset(sql, 0, sizeof(sql));
                         sprintf(sql, "SELECT username FROM user WHERE username like '%s';", clientMessage);
                         loginCommand(db, sql, adminORuser, serverResponse, clientMessage, 2);
@@ -180,15 +179,12 @@ int main() {
                     } else if (adminORuser == 2) {        // in cazul in care clietntul este conectat ca un user common
                         strcpy(serverResponse, "You don't have the permission to use this command.\n");
                     } else {
-                        printf("[server]sunt aici\n");
                         char userName[100];
                         char right[4];
                         strcpy(clientMessage, clientMessage + strlen("restrict vote for "));
 
-                        getUserName(clientMessage,
-                                    userName);      // preluam usernameul utilizatorului caruia vrom sa ii schimba dreptul de a vota
-                        strcpy(right, clientMessage + strlen(userName) +
-                                      1);         // pastram doar dreptul pe care vrem sa il schimbam
+                        getUserName(clientMessage, userName);      // preluam usernameul utilizatorului caruia vrom sa ii schimba dreptul de a vota
+                        strcpy(right, clientMessage + strlen(userName) + 1);         // pastram doar dreptul pe care vrem sa il schimbam
                         restrictVoteCommand(db, userName, right, serverResponse);
                     }
                 } else if (command == 7) {     // add song
@@ -198,7 +194,6 @@ int main() {
                         strcpy(serverResponse, "You don't have the permission to use this command.");
                     } else {
                         strcpy(clientMessage, clientMessage + strlen("add song "));
-                        printf("[server]in add song command: '%s'\n", clientMessage);
                         addSongCommand(db, clientMessage, serverResponse);
                     }
                 } else if (command == 8) {
@@ -263,15 +258,15 @@ int main() {
                 } else if (command == 13) { // help
                     if (adminORuser == 0)
                         strcpy(serverResponse, "\n\tCommands available:\n"
-                                               "1. help \t\t\t\\\\will show you what commands you can execute while not logged or logged as user or admin\n"
+                                               "1. help \t\t\t\\\\will show you what commands you can execute while not logged in or logged in as user or admin\n"
                                                "2. login user your_username \t\\\\if you want to login as an user\n"
                                                "3. login admin your_username \t\\\\if you want to login as an admin\n"
                                                "4. register your_new_username \t\\\\will create a new username\n"
                                                "5. quit\t\t\t\t\\\\will close the application\n");
                     else if (adminORuser == 2)
                         strcpy(serverResponse, "\n\tCommands available for users:\n"
-                                               "1. help \t\t\t\t\t\t\\\\will show you what commands you can execute while not logged or logged as user or admin\n"
-                                               "2. add song <title> <description> <link> <genre(s)> \t\\\\you can add a new song to the top (between genres you need to use ',')\n"
+                                               "1. help \t\t\t\t\t\t\\\\will show you what commands you can execute while not logged in or logged in as user or admin\n"
+                                               "2. add song <title> <description> <link> <genre(s)> \t\\\\you can add a new song to the top (genres need to be separated by ',')\n"
                                                "3. vote song id_song \t\t\t\t\t\\\\you can vote a song based on its id if you have the privilege\n"
                                                "4. add comment <your_comment> <song_ID> \t\t\\\\you can add a comment to a song based on its id\n"
                                                "5. see top general \t\t\t\t\t\\\\will show you the general top based on votes\n"
@@ -283,7 +278,7 @@ int main() {
                                                "11. quit\t\t\t\t\t\t\\\\will close the application\n");
                     else
                         strcpy(serverResponse, "\n\tCommands available for admins:\n"
-                                               "1. help \t\t\t\t\t\\\\will show you what commands you can execute while not logged or logged as user or admin\n"
+                                               "1. help \t\t\t\t\t\\\\will show you what commands you can execute while not logged in or logged in as user or admin\n"
                                                "2. see top general \t\t\t\t\\\\will show you the general top based on votes\n"
                                                "3. delete song id_song \t\t\t\t\\\\will delete the song with the id given if exists\n"
                                                "4. see users \t\t\t\t\t\\\\will show you the list of usernames\n"
@@ -333,7 +328,6 @@ int main() {
                     }
                 } else
                     strcpy(serverResponse, "Wrong format or nonexistent command. Try again!\n"); // no known command
-                //erase_empty_tables(db); // stergerea tabelelor cu genuri goale
                 /* returnam mesajul clientului */
                 if (write(client, serverResponse, strlen(serverResponse)) <= 0) {
                     perror("[server]Eroare la write() catre client.\n");
