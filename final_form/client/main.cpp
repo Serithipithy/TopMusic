@@ -11,6 +11,10 @@
 #include <fstream>
 #include <string>
 
+#define KNRM  "\x1B[0m"
+#define KRED  "\x1B[31m"
+#define KBLU  "\x1B[34m"
+#define KCYN  "\x1B[36m"
 /* codul de eroare returnat de anumite apeluri */
 extern int errno;
 
@@ -54,12 +58,20 @@ int main(int argc, char *argv[]) {
     // mesaj de intampinare
     std::string header( 40, '=' );
     char welcome[]="\n\n\n\t\t\t\t  Welcome to TopMusic!";
+    sleep(static_cast<unsigned int>(0.5));
     char somethingcute[]="\t\t\tWhere you find your favorite application \n\t\t\t\t\t   and \n\t\t\t  your favorite songs in the same place ";
-    printf ("%s\n%s\n\n\n\n",welcome,somethingcute);
+    sleep(static_cast<unsigned int>(0.5));
+    printf ("%s%s\n%s\n\n\n\n "
+            "\n\tCommands available:\n"
+            "1. help \n"
+            "2. login user your_username \n"
+            "3. login admin your_username \n"
+            "4. register your_new_username \n"
+            "5. quit %s\n\n\n",KBLU,welcome,somethingcute,KNRM);
     while (1) {
         // citire comanda client
         bzero(msgToSend, 2048);
-        printf(":: ");
+        printf("%s:: %s",KBLU,KNRM);
         fflush(stdout);
         read(0, msgToSend, 2048);
         msgToSend[strlen(msgToSend) - 1] = '\0';
@@ -78,7 +90,7 @@ int main(int argc, char *argv[]) {
         }
 
         // afisare mesaj trimis de catre server
-        printf(">> %s\n", msgRead);
+        printf("\n%s %s%s\n",KBLU, msgRead,KNRM);
         fflush(stdout);
         if (strcmp(msgRead, "Quit!\n") == 0) {
             break;
